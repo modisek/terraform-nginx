@@ -1,0 +1,46 @@
+---
+- name: configure nginx
+  hosts: server
+  become: yes
+  vars:
+    server_name: "{{ ansible_default_ipv4.address }}"
+    document_root: /var/www
+    app_root: public
+  tasks:
+    - name: install nginx
+      apt:
+        update_cache: yes
+        name: nginx 
+
+    - name: start nginx
+      shell: sudo systemctl start nginx
+
+    - name: copy files to the server
+      synchronize:
+        src: "{{ app_root }}"
+        dest: "{{ document_root }}"
+
+    - name: apply nginx template
+      template:
+        src: ../nginx.conf.j2
+        dest: /etc/nginx/sites-available/default
+      notify: Restart nginx
+
+    - name: Enable new site
+      file:
+        src: /etc/nginx/sites-available/default
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+      notify: Restart nginx
+
+    - name: allow acces to port 80
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+
+  handlers:
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
